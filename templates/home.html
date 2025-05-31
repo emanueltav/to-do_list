@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Minha To-Do List</title>
+</head>
+<body>
+    <h2>Bem-vindo, {{ user.username }}!</h2>
+    <form method="POST" action="{{ url_for('add_task') }}">
+        <input type="text" name="title" placeholder="Nova tarefa" required>
+        <button type="submit">Adicionar</button>
+    </form>
+    <ul>
+        {% for task in tasks %}
+            <li>
+                {% if task.is_done %}
+                    <s>{{ task.title }}</s>
+                {% else %}
+                    {{ task.title }}
+                {% endif %}
+                <a href="{{ url_for('toggle_task', task_id=task.id) }}">[Concluir]</a>
+                <a href="{{ url_for('delete_task', task_id=task.id) }}">[Excluir]</a>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('logout') }}">Sair</a>
+</body>
+</html>

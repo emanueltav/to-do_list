@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Minhas Listas{% endblock %}
+
+{% block content %}
+<h2>Minhas Listas</h2>
+
+<p><a href="/lists/new">Criar nova lista</a></p>
+
+<ul>
+    {% for lista in listas %}
+        <li>
+            {{ lista.nome }} -
+            <a href="/lists/edit/{{ lista.id }}">Editar</a> |
+            <a href="/lists/delete/{{ lista.id }}">Excluir</a>
+        </li>
+    {% else %}
+        <li>Nenhuma li
