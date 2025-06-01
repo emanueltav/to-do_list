@@ -5,18 +5,12 @@ import os
 app = Flask(__name__)
 app.secret_key = 'seu_segredo_aqui'
 
-# Caminho absoluto para evitar erros
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Configuração do banco
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
-# =======================
-# MODELOS
-# =======================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -30,9 +24,6 @@ class Task(db.Model):
     is_done = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-# =======================
-# ROTAS
-# =======================
 
 @app.route('/')
 def home():
@@ -105,9 +96,6 @@ def toggle_task(task_id):
         db.session.commit()
     return redirect(url_for('home'))
 
-# =======================
-# CRIAR BANCO
-# =======================
 
 if __name__ == '__main__':
     with app.app_context():

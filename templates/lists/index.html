@@ -2,16 +2,27 @@
 {% block title %}Minhas Listas{% endblock %}
 
 {% block content %}
-<h2>Minhas Listas</h2>
+<div class="container my-5" style="max-width: 600px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Minhas Listas</h2>
+    <a href="/lists/new" class="btn btn-success btn-sm">Criar nova lista</a>
+  </div>
 
-<p><a href="/lists/new">Criar nova lista</a></p>
-
-<ul>
+  {% if listas %}
+  <ul class="list-group">
     {% for lista in listas %}
-        <li>
-            {{ lista.nome }} -
-            <a href="/lists/edit/{{ lista.id }}">Editar</a> |
-            <a href="/lists/delete/{{ lista.id }}">Excluir</a>
-        </li>
-    {% else %}
-        <li>Nenhuma li
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        {{ lista.nome }}
+        <span>
+          <a href="/lists/edit/{{ lista.id }}" class="btn btn-primary btn-sm me-2">Editar</a>
+          <a href="/lists/delete/{{ lista.id }}" class="btn btn-danger btn-sm" 
+             onclick="return confirm('Tem certeza que deseja excluir esta lista?');">Excluir</a>
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    <div class="alert alert-info">Nenhuma lista encontrada.</div>
+  {% endif %}
+</div>
+{% endblock %}
