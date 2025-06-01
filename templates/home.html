@@ -10,17 +10,32 @@
   <div class="container py-5" style="max-width: 600px;">
     <h2 class="mb-4 text-center">Bem-vindo, {{ user.username }}!</h2>
 
-    <form method="POST" action="{{ url_for('add_task') }}" class="input-group mb-4">
-      <input
-        type="text"
-        name="title"
-        placeholder="Nova tarefa"
-        required
-        class="form-control"
-        aria-label="Nova tarefa"
-      />
-      <button type="submit" class="btn btn-primary">Adicionar</button>
-    </form>
+    <h2>Adicionar Tarefa</h2>
+<form method="POST" action="{{ url_for('add_task') }}">
+    <label>Título:</label>
+    <input type="text" name="title" required><br><br>
+
+    <label>Descrição:</label>
+    <input type="text" name="description" required><br><br>
+
+    <button type="submit">Adicionar</button>
+</form>
+
+<ul>
+    {% for task in tasks %}
+        <li>
+            <strong>{{ task.title }}</strong>: {{ task.description }}
+            {% if task.is_done %}
+                (Concluído)
+            {% else %}
+                (Pendente)
+            {% endif %}
+            <a href="{{ url_for('toggle_task', task_id=task.id) }}">[Alternar]</a>
+            <a href="{{ url_for('delete_task', task_id=task.id) }}">[Excluir]</a>
+        </li>
+    {% endfor %}
+</ul>
+
 
     {% if tasks %}
     <ul class="list-group mb-4">
