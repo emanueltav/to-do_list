@@ -140,6 +140,49 @@ def edit_task(task_id):
     return redirect(url_for('home'))
 
 
+# 🚀 CRUD de Usuário
+
+@app.route('/update_account', methods=['POST'])
+def update_account():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+
+    new_username = request.form['username'].strip()
+    new_password = request.form['password'].strip()
+
+    if not new_username or not new_password:
+        return 'Preencha todos os campos!'
+
+    existing_user = User.query.filter_by(username=new_username).first()
+    if existing_user and existing_user.id != user.id:
+        return 'Nome de usuário já está em uso.'
+
+    user.username = new_username
+    user.password = new_password
+    db.session.commit()
+
+    return redirect(url_for('home'))
+
+
+@app.route('/delete_account', methods=['POST'])
+def delete_account():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+
+    Task.query.filter_by(user_id=user.id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+
+    session.pop('user_id', None)
+
+    return redirect(url_for('register'))
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
