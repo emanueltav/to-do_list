@@ -2,9 +2,12 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 import os
 
+
+# config inicial
 app = Flask(__name__)
 app.secret_key = 'curioso'
 
+# sqlite
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -12,6 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
+# modelos do banco de dados
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -36,8 +40,77 @@ class Task(db.Model):
     tasklist_id = db.Column(db.Integer, db.ForeignKey('task_list.id'), nullable=False)
 
 
+# register
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+
+        if not username or not password:
+            return 'Preencha todos os campos!'
+
+        if User.query.filter_by(username=username).first():
+            return 'Usuário já existe!'
+
+        new_user = User(username=username, password=password)
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('login'))
+
+    return render_template('auth/register.html')
+
+
+# login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+
+        user = User.query.filter_by(username=username, password=password).first()
+        if user:
+            session['user_id'] = user.id
+            return redirect(url_for('home'))
+        return 'Credenciais inválidas!'
+
+    return render_template('auth/login.html')
+
+
+# logout
+@app.route('/logout')
+def logout():
+
+    session.pop('user_id', None)
+    return redirect(url_for('login'))
+
+
+# deletar usuario
+@app.route('/delete_account', methods=['POST'])
+def delete_account():
+
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.get(session['user_id'])
+
+    TaskList.query.filter_by(user_id=user.id).delete()
+    Task.query.filter_by(user_id=user.id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+
+    session.pop('user_id', None)
+
+    return redirect(url_for('login'))
+
+
+# home
 @app.route('/')
 def home():
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -49,8 +122,10 @@ def home():
     return render_template('to-do/list.html', task_lists=task_lists, user=user)
 
 
+# criar lista
 @app.route('/create_list', methods=['POST'])
 def create_list():
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -65,8 +140,25 @@ def create_list():
     return redirect(url_for('home'))
 
 
+# ver lista e tarefa
+@app.route('/list/<int:list_id>')
+def view_list(list_id):
+
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task_list = TaskList.query.get(list_id)
+    if not task_list or task_list.user_id != session['user_id']:
+        return 'Lista não encontrada ou acesso negado.'
+
+    tasks = Task.query.filter_by(tasklist_id=task_list.id).all()
+    return render_template('to-do/task.html', task_list=task_list, tasks=tasks)
+
+
+# excluir lista
 @app.route('/delete_list/<int:list_id>')
 def delete_list(list_id):
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -78,28 +170,31 @@ def delete_list(list_id):
     return redirect(url_for('home'))
 
 
-@app.route('/list/<int:list_id>')
-def view_list(list_id):
+# editar lista
+@app.route('/edit_list/<int:list_id>', methods=['POST'])
+def edit_list(list_id):
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     task_list = TaskList.query.get(list_id)
+    if task_list and task_list.user_id == session['user_id']:
+        new_name = request.form['name'].strip()
+        if new_name:
+            task_list.name = new_name
+            db.session.commit()
 
-    if not task_list or task_list.user_id != session['user_id']:
-        return 'Lista não encontrada ou acesso negado.'
-
-    tasks = Task.query.filter_by(tasklist_id=task_list.id).all()
-
-    return render_template('to-do/task.html', task_list=task_list, tasks=tasks)
+    return redirect(url_for('home'))
 
 
+# adicionar tarefa
 @app.route('/add_task/<int:list_id>', methods=['POST'])
 def add_task(list_id):
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     task_list = TaskList.query.get(list_id)
-
     if not task_list or task_list.user_id != session['user_id']:
         return 'Lista não encontrada ou acesso negado.'
 
@@ -121,8 +216,10 @@ def add_task(list_id):
     return redirect(url_for('view_list', list_id=list_id))
 
 
+# excluir tarefa
 @app.route('/delete_task/<int:task_id>')
 def delete_task(task_id):
+
     task = Task.query.get(task_id)
 
     if task and task.user_id == session['user_id']:
@@ -134,8 +231,10 @@ def delete_task(task_id):
     return redirect(url_for('home'))
 
 
+# status da tarefa
 @app.route('/toggle_task/<int:task_id>')
 def toggle_task(task_id):
+
     task = Task.query.get(task_id)
 
     if task and task.user_id == session['user_id']:
@@ -146,49 +245,34 @@ def toggle_task(task_id):
     return redirect(url_for('home'))
 
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password'].strip()
+# editar tarefa
+@app.route('/edit_task/<int:task_id>', methods=['POST'])
+def edit_task(task_id):
 
-        if not username or not password:
-            return 'Preencha todos os campos!'
-
-        if User.query.filter_by(username=username).first():
-            return 'Usuário já existe!'
-
-        new_user = User(username=username, password=password)
-        db.session.add(new_user)
-        db.session.commit()
+    if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    return render_template('auth/register.html')
+    task = Task.query.get(task_id)
+
+    if task and task.user_id == session['user_id']:
+        new_title = request.form['title'].strip()
+        new_description = request.form['description'].strip()
+
+        if new_title and new_description:
+            task.title = new_title
+            task.description = new_description
+            db.session.commit()
+
+        return redirect(url_for('view_list', list_id=task.tasklist_id))
+
+    return redirect(url_for('home'))
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        password = request.form['password'].strip()
 
-        user = User.query.filter_by(username=username, password=password).first()
-        if user:
-            session['user_id'] = user.id
-            return redirect(url_for('home'))
-        return 'Credenciais inválidas!'
-
-    return render_template('auth/login.html')
-
-
-@app.route('/logout')
-def logout():
-    session.pop('user_id', None)
-    return redirect(url_for('login'))
-
-
+# editar user
 @app.route('/update_account', methods=['POST'])
 def update_account():
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -211,8 +295,10 @@ def update_account():
     return redirect(url_for('home'))
 
 
+# deletar user
 @app.route('/delete_account', methods=['POST'])
 def delete_account():
+
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -229,7 +315,7 @@ def delete_account():
     return redirect(url_for('login'))
 
 
-
+# iniciar banco
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
