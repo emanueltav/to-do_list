@@ -140,7 +140,6 @@ def edit_task(task_id):
     return redirect(url_for('home'))
 
 
-# 🚀 CRUD de Usuário
 
 @app.route('/update_account', methods=['POST'])
 def update_account():
@@ -180,7 +179,7 @@ def delete_account():
 
     session.pop('user_id', None)
 
-    return redirect(url_for('register'))
+    return redirect(url_for('login'))
 
 
 if __name__ == '__main__':
