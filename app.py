@@ -6,7 +6,6 @@ app = Flask(__name__)
 app.secret_key = 'curioso'
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -17,7 +16,15 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
+    tasklists = db.relationship('TaskList', backref='user', lazy=True)
     tasks = db.relationship('Task', backref='user', lazy=True)
+
+
+class TaskList(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tasks = db.relationship('Task', backref='tasklist', lazy=True, cascade="all, delete-orphan")
 
 
 class Task(db.Model):
@@ -26,6 +33,7 @@ class Task(db.Model):
     description = db.Column(db.String(500), nullable=False)
     is_done = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tasklist_id = db.Column(db.Integer, db.ForeignKey('task_list.id'), nullable=False)
 
 
 @app.route('/')
@@ -37,8 +45,105 @@ def home():
     if user is None:
         return redirect(url_for('login'))
 
-    tasks = Task.query.filter_by(user_id=user.id).all()
-    return render_template('home.html', tasks=tasks, user=user)
+    task_lists = TaskList.query.filter_by(user_id=user.id).all()
+    return render_template('to-do/list.html', task_lists=task_lists, user=user)
+
+
+@app.route('/create_list', methods=['POST'])
+def create_list():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    name = request.form['name'].strip()
+    if not name:
+        return 'Nome da lista é obrigatório!'
+
+    new_list = TaskList(name=name, user_id=session['user_id'])
+    db.session.add(new_list)
+    db.session.commit()
+
+    return redirect(url_for('home'))
+
+
+@app.route('/delete_list/<int:list_id>')
+def delete_list(list_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task_list = TaskList.query.get(list_id)
+    if task_list and task_list.user_id == session['user_id']:
+        db.session.delete(task_list)
+        db.session.commit()
+
+    return redirect(url_for('home'))
+
+
+@app.route('/list/<int:list_id>')
+def view_list(list_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task_list = TaskList.query.get(list_id)
+
+    if not task_list or task_list.user_id != session['user_id']:
+        return 'Lista não encontrada ou acesso negado.'
+
+    tasks = Task.query.filter_by(tasklist_id=task_list.id).all()
+
+    return render_template('to-do/task.html', task_list=task_list, tasks=tasks)
+
+
+@app.route('/add_task/<int:list_id>', methods=['POST'])
+def add_task(list_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task_list = TaskList.query.get(list_id)
+
+    if not task_list or task_list.user_id != session['user_id']:
+        return 'Lista não encontrada ou acesso negado.'
+
+    title = request.form['title'].strip()
+    description = request.form['description'].strip()
+
+    if not title or not description:
+        return 'Título e descrição são obrigatórios!'
+
+    new_task = Task(
+        title=title,
+        description=description,
+        user_id=session['user_id'],
+        tasklist_id=list_id
+    )
+    db.session.add(new_task)
+    db.session.commit()
+
+    return redirect(url_for('view_list', list_id=list_id))
+
+
+@app.route('/delete_task/<int:task_id>')
+def delete_task(task_id):
+    task = Task.query.get(task_id)
+
+    if task and task.user_id == session['user_id']:
+        list_id = task.tasklist_id
+        db.session.delete(task)
+        db.session.commit()
+        return redirect(url_for('view_list', list_id=list_id))
+
+    return redirect(url_for('home'))
+
+
+@app.route('/toggle_task/<int:task_id>')
+def toggle_task(task_id):
+    task = Task.query.get(task_id)
+
+    if task and task.user_id == session['user_id']:
+        task.is_done = not task.is_done
+        db.session.commit()
+        return redirect(url_for('view_list', list_id=task.tasklist_id))
+
+    return redirect(url_for('home'))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -82,65 +187,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/add', methods=['POST'])
-def add_task():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    title = request.form['title'].strip()
-    description = request.form['description'].strip()
-
-    if not title or not description:
-        return 'Título e descrição são obrigatórios!'
-
-    new_task = Task(title=title, description=description, user_id=session['user_id'])
-    db.session.add(new_task)
-    db.session.commit()
-    return redirect(url_for('home'))
-
-
-@app.route('/delete/<int:task_id>')
-def delete_task(task_id):
-    task = Task.query.get(task_id)
-    if task and task.user_id == session['user_id']:
-        db.session.delete(task)
-        db.session.commit()
-    return redirect(url_for('home'))
-
-
-@app.route('/toggle/<int:task_id>')
-def toggle_task(task_id):
-    task = Task.query.get(task_id)
-    if task and task.user_id == session['user_id']:
-        task.is_done = not task.is_done
-        db.session.commit()
-    return redirect(url_for('home'))
-
-
-@app.route('/edit/<int:task_id>', methods=['POST'])
-def edit_task(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    task = Task.query.get(task_id)
-
-    if not task or task.user_id != session['user_id']:
-        return 'Tarefa não encontrada ou acesso negado.'
-
-    title = request.form['title'].strip()
-    description = request.form['description'].strip()
-
-    if not title or not description:
-        return 'Título e descrição são obrigatórios!'
-
-    task.title = title
-    task.description = description
-    db.session.commit()
-
-    return redirect(url_for('home'))
-
-
-
 @app.route('/update_account', methods=['POST'])
 def update_account():
     if 'user_id' not in session:
@@ -172,6 +218,7 @@ def delete_account():
 
     user = User.query.get(session['user_id'])
 
+    TaskList.query.filter_by(user_id=user.id).delete()
     Task.query.filter_by(user_id=user.id).delete()
 
     db.session.delete(user)
@@ -180,6 +227,7 @@ def delete_account():
     session.pop('user_id', None)
 
     return redirect(url_for('login'))
+
 
 
 if __name__ == '__main__':
