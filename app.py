@@ -19,6 +19,7 @@ class User(db.Model):
     password = db.Column(db.String(100), nullable=False)
     tasks = db.relationship('Task', backref='user', lazy=True)
 
+
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -38,7 +39,6 @@ def home():
 
     tasks = Task.query.filter_by(user_id=user.id).all()
     return render_template('home.html', tasks=tasks, user=user)
-
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -105,7 +105,6 @@ def add_task():
     return redirect(url_for('home'))
 
 
-
 @app.route('/delete/<int:task_id>')
 def delete_task(task_id):
     task = Task.query.get(task_id)
@@ -124,7 +123,7 @@ def toggle_task(task_id):
     return redirect(url_for('home'))
 
 
-@app.route('/edit/<int:task_id>', methods=['GET', 'POST'])
+@app.route('/edit/<int:task_id>', methods=['POST'])
 def edit_task(task_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -134,21 +133,17 @@ def edit_task(task_id):
     if not task or task.user_id != session['user_id']:
         return 'Tarefa não encontrada ou acesso negado.'
 
-    if request.method == 'POST':
-        title = request.form['title'].strip()
-        description = request.form['description'].strip()
+    title = request.form['title'].strip()
+    description = request.form['description'].strip()
 
-        if not title or not description:
-            return 'Título e descrição são obrigatórios!'
+    if not title or not description:
+        return 'Título e descrição são obrigatórios!'
 
-        task.title = title
-        task.description = description
-        db.session.commit()
+    task.title = title
+    task.description = description
+    db.session.commit()
 
-        return redirect(url_for('home'))
-
-    return render_template('edit_task.html', task=task)
-
+    return redirect(url_for('home'))
 
 
 if __name__ == '__main__':
