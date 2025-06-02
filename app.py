@@ -82,12 +82,6 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/change_user')
-def change_user():
-    session.pop('user_id', None)
-    return redirect(url_for('login'))
-
-
 @app.route('/add', methods=['POST'])
 def add_task():
     if 'user_id' not in session:
