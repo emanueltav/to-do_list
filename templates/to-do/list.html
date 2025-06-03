@@ -76,28 +76,33 @@
 <div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
+
       <div class="modal-header">
           <h5 class="modal-title">Gerenciar Conta</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
+
       <div class="modal-body">
-        <form method="POST" action="{{ url_for('update_account') }}">
-          <div class="mb-3">
-            <label class="form-label">Novo Nome de Usuário</label>
-            <input type="text" class="form-control" name="username" value="{{ user.username }}" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Nova Senha</label>
-            <input type="password" class="form-control" name="password" required>
-          </div>
-          <div class="modal-footer d-flex justify-content-between">
-            <button type="submit" class="btn btn-primary">Atualizar Conta</button>
-            <form method="POST" action="{{ url_for('delete_account') }}" onsubmit="return confirm('Tem certeza que deseja deletar sua conta? Esta ação é irreversível.')">
-              <button type="submit" class="btn btn-danger">Deletar Conta</button>
-            </form>
-          </div>
-        </form>
+        <div class="d-flex gap-2">
+
+          <form method="POST" action="{{ url_for('update_account') }}" class="flex-fill">
+            <div class="mb-3">
+              <label class="form-label">Novo Nome de Usuário</label>
+              <input type="text" class="form-control" name="username" value="{{ user.username }}" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Nova Senha</label>
+              <input type="password" class="form-control" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Atualizar Conta</button>
+          </form>
+
+          <form method="POST" action="{{ url_for('delete_account') }}" onsubmit="return confirm('Tem certeza que deseja deletar sua conta? Esta ação é irreversível.')" class="flex-fill d-flex align-items-end">
+            <button type="submit" class="btn btn-danger w-100">Deletar Conta</button>
+          </form>
+        </div>
       </div>
+
     </div>
   </div>
 </div>
