@@ -2,12 +2,9 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 import os
 
-
-# config inicial
 app = Flask(__name__)
 app.secret_key = 'curioso'
 
-# sqlite
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -15,7 +12,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# modelos do banco de dados
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -40,10 +36,8 @@ class Task(db.Model):
     tasklist_id = db.Column(db.Integer, db.ForeignKey('task_list.id'), nullable=False)
 
 
-# register
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
@@ -62,10 +56,8 @@ def register():
     return render_template('auth/register.html')
 
 
-# login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
@@ -79,38 +71,61 @@ def login():
     return render_template('auth/login.html')
 
 
-# logout
 @app.route('/logout')
 def logout():
-
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
 
-# deletar usuario
-@app.route('/delete_account', methods=['POST'])
-def delete_account():
-
+@app.route('/update_account', methods=['POST'])
+def update_account():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
+    new_username = request.form['username'].strip()
+    new_password = request.form['password'].strip()
 
-    TaskList.query.filter_by(user_id=user.id).delete()
-    Task.query.filter_by(user_id=user.id).delete()
+    if not new_username or not new_password:
+        return 'Preencha todos os campos!'
 
-    db.session.delete(user)
+    existing_user = User.query.filter_by(username=new_username).first()
+    if existing_user and existing_user.id != user.id:
+        return 'Nome de usuário já está em uso.'
+
+    user.username = new_username
+    user.password = new_password
     db.session.commit()
 
-    session.pop('user_id', None)
+    return redirect(url_for('home'))
 
+
+@app.route('/delete_account', methods=['POST'])
+def delete_account():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+
+    lists = TaskList.query.filter_by(user_id=user_id).all()
+    for task_list in lists:
+        db.session.delete(task_list)
+
+    tasks = Task.query.filter_by(user_id=user_id).all()
+    for task in tasks:
+        db.session.delete(task)
+
+    user = User.query.get(user_id)
+    if user:
+        db.session.delete(user)
+
+    db.session.commit()
+    session.clear()
     return redirect(url_for('login'))
 
 
-# home
 @app.route('/')
 def home():
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -122,10 +137,8 @@ def home():
     return render_template('to-do/list.html', task_lists=task_lists, user=user)
 
 
-# criar lista
 @app.route('/create_list', methods=['POST'])
 def create_list():
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -140,10 +153,8 @@ def create_list():
     return redirect(url_for('home'))
 
 
-# ver lista e tarefa
 @app.route('/list/<int:list_id>')
 def view_list(list_id):
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -155,25 +166,8 @@ def view_list(list_id):
     return render_template('to-do/task.html', task_list=task_list, tasks=tasks)
 
 
-# excluir lista
-@app.route('/delete_list/<int:list_id>')
-def delete_list(list_id):
-
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    task_list = TaskList.query.get(list_id)
-    if task_list and task_list.user_id == session['user_id']:
-        db.session.delete(task_list)
-        db.session.commit()
-
-    return redirect(url_for('home'))
-
-
-# editar lista
 @app.route('/edit_list/<int:list_id>', methods=['POST'])
 def edit_list(list_id):
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -187,10 +181,21 @@ def edit_list(list_id):
     return redirect(url_for('home'))
 
 
-# adicionar tarefa
+@app.route('/delete_list/<int:list_id>')
+def delete_list(list_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    task_list = TaskList.query.get(list_id)
+    if task_list and task_list.user_id == session['user_id']:
+        db.session.delete(task_list)
+        db.session.commit()
+
+    return redirect(url_for('home'))
+
+
 @app.route('/add_task/<int:list_id>', methods=['POST'])
 def add_task(list_id):
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -216,44 +221,12 @@ def add_task(list_id):
     return redirect(url_for('view_list', list_id=list_id))
 
 
-# excluir tarefa
-@app.route('/delete_task/<int:task_id>')
-def delete_task(task_id):
-
-    task = Task.query.get(task_id)
-
-    if task and task.user_id == session['user_id']:
-        list_id = task.tasklist_id
-        db.session.delete(task)
-        db.session.commit()
-        return redirect(url_for('view_list', list_id=list_id))
-
-    return redirect(url_for('home'))
-
-
-# status da tarefa
-@app.route('/toggle_task/<int:task_id>')
-def toggle_task(task_id):
-
-    task = Task.query.get(task_id)
-
-    if task and task.user_id == session['user_id']:
-        task.is_done = not task.is_done
-        db.session.commit()
-        return redirect(url_for('view_list', list_id=task.tasklist_id))
-
-    return redirect(url_for('home'))
-
-
-# editar tarefa
 @app.route('/edit_task/<int:task_id>', methods=['POST'])
 def edit_task(task_id):
-
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     task = Task.query.get(task_id)
-
     if task and task.user_id == session['user_id']:
         new_title = request.form['title'].strip()
         new_description = request.form['description'].strip()
@@ -268,54 +241,31 @@ def edit_task(task_id):
     return redirect(url_for('home'))
 
 
+@app.route('/delete_task/<int:task_id>')
+def delete_task(task_id):
+    task = Task.query.get(task_id)
 
-# editar user
-@app.route('/update_account', methods=['POST'])
-def update_account():
-
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    user = User.query.get(session['user_id'])
-
-    new_username = request.form['username'].strip()
-    new_password = request.form['password'].strip()
-
-    if not new_username or not new_password:
-        return 'Preencha todos os campos!'
-
-    existing_user = User.query.filter_by(username=new_username).first()
-    if existing_user and existing_user.id != user.id:
-        return 'Nome de usuário já está em uso.'
-
-    user.username = new_username
-    user.password = new_password
-    db.session.commit()
+    if task and task.user_id == session['user_id']:
+        list_id = task.tasklist_id
+        db.session.delete(task)
+        db.session.commit()
+        return redirect(url_for('view_list', list_id=list_id))
 
     return redirect(url_for('home'))
 
 
-# deletar user
-@app.route('/delete_account', methods=['POST'])
-def delete_account():
+@app.route('/toggle_task/<int:task_id>')
+def toggle_task(task_id):
+    task = Task.query.get(task_id)
 
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
+    if task and task.user_id == session['user_id']:
+        task.is_done = not task.is_done
+        db.session.commit()
+        return redirect(url_for('view_list', list_id=task.tasklist_id))
 
-    user = User.query.get(session['user_id'])
-
-    TaskList.query.filter_by(user_id=user.id).delete()
-    Task.query.filter_by(user_id=user.id).delete()
-
-    db.session.delete(user)
-    db.session.commit()
-
-    session.pop('user_id', None)
-
-    return redirect(url_for('login'))
+    return redirect(url_for('home'))
 
 
-# iniciar banco
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
